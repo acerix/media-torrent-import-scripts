@@ -4,6 +4,8 @@ import json
 from urllib.parse import quote_plus
 import requests
 from lxml import etree
+import re
+import datetime
 
 # config
 import config
@@ -23,7 +25,8 @@ requests_session.headers.update({
 })
 
 
-
+# DEV
+from pprint import pprint
 
 
 
@@ -57,13 +60,34 @@ def get_index_page_episode_magnets(page_number = 0):
   # find episode links
   magnet_els = dom_tree.xpath('//a[@class="epinfo"]')
 
-  # get title
-  # get hash
-  # get S/E #'s
   for magnet_el in magnet_els:
     magnet = {}
 
-    print(magnet_el.text)
+    # match episode code (eg. S02E13) or episode date (eg. 2017 12 31)
+    episode_code_match = re.match(r'(?P<title>.*)(S(?P<season>\d\d)E(?P<episode>\d\d)|(?P<release_date>(20|19)\d\d [01]\d [0123]\d))(?P<quality>.*)', magnet_el.text)
+    if not episode_code_match:
+      print('No episode code or release date found.')
+      exit()
+
+    magnet['title'] = episode_code_match.group('title').strip()
+    magnet['season_number'] = episode_code_match.group('season')
+    magnet['episode_number'] = episode_code_match.group('episode')
+    release_date = episode_code_match.group('release_date')
+
+    if len(magnet['title']) < 4:
+      print('Title too short')
+      exit()
+
+    # put date in ISO format, ensuring it is valid
+    if release_date:
+      parsed_release_date = datetime.datetime.strptime(release_date, '%Y %m %d')
+      magnet['release_date'] = parsed_release_date.strftime('%Y-%m-%d')
+
+
+    # @todo get hash!
+
+    # @todo detect quality level from string
+    #quality_info = episode_code_match.group('quality').strip()
 
     magnets.append(magnet)
 
@@ -82,14 +106,6 @@ for page_number in range(start_page_number,last_page_number):
     break
   print('wood loop')
   exit()
-
-
-
-
-
-
-
-
 
 
 
@@ -205,7 +221,6 @@ VALUES
 })
 
     return movie_id
-
 
 
 # find/add release
@@ -505,6 +520,7 @@ VALUES
 with open(import_csv_filename) as csv_file:
   csv_reader = csv.DictReader(csv_file)
   for row in csv_reader:
+
 
     # import torrent
     row['torrent_id'] = get_torrent_id(row)

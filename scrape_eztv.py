@@ -147,3 +147,12 @@ for page_number in range(start_page_number,last_page_number):
   if len(magnets) == 0:
     print('No magnets found, assuming last page reached.')
     break
+
+  for magnet in magnets:
+    mediatorrentdb.add_magnet(magnet)
+    mediatorrentdb.get_imdb_data(magnet)
+    print(magnet)
+    exit()
+
+  print('first page donezo')
+  exit()

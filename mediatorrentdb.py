@@ -1,4 +1,25 @@
 
+# config
+import config
+
+# database connection
+db = config.db_connect()
+db_cursor = db.cursor()
+
+# add imdb data to the magnet
+def get_imdb_data(import_row):
+  print('get data from imdb...')
+  exit()
+  import_row['id'] = 69
+  return import_row
+
+# add magnet, return True if added, False if already exists
+def add_magnet(import_row):
+  torrent_id = get_torrent_id(import_row)
+  # @todo add release or return False if release already added
+  return True
+
+
 # find/add torrent
 def get_torrent_id(import_row):
   db_cursor.execute("""
@@ -25,6 +46,7 @@ VALUES
   :info_hash
 )
 """, import_row)
+    db.commit()
     return db_cursor.lastrowid
 
 

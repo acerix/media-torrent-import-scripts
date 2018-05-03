@@ -10,6 +10,9 @@ import datetime
 # config
 import config
 
+# media-torrent-db stuff
+import mediatorrentdb
+
 base_url = 'https://eztv.ag/'
 start_page_number = 0
 last_page_number = 2000
@@ -84,19 +87,19 @@ def get_index_page_episode_magnets(page_number = 0):
 
     if episode_code_match:
       # most episodes match...
-      magnet['title'] = episode_code_match.group('title').strip()
-      magnet['season_number'] = episode_code_match.group('season')
-      magnet['episode_number'] = episode_code_match.group('episode')
+      magnet['series_title'] = episode_code_match.group('title').strip()
+      magnet['season'] = episode_code_match.group('season')
+      magnet['episode'] = episode_code_match.group('episode')
     else:
       # @todo strip quality, release info, etc., try to get series/episode number
       # eg. "Ch4 Big Ben Saving the Worlds Most Famous Clock 1080i HDTV MVGroup mkv [eztv]" should be "Big Ben Saving the Worlds Most Famous Clock"
-      magnet['title'] = magnet_el.text.strip()
+      magnet['series_title'] = magnet_el.text.strip()
 
 
-    if len(magnet['title']) < 2:
+    if len(magnet['series_title']) < 2:
       print('Title too short')
       pprint(magnet_el.text)
-      pprint(magnet['title'])
+      pprint(magnet['series_title'])
       exit()
 
     # put date in ISO format, ensuring it is valid
@@ -109,24 +112,25 @@ def get_index_page_episode_magnets(page_number = 0):
         parsed_release_date = datetime.datetime.strptime(release_date, '%Y %d %m')
         magnet['release_date'] = parsed_release_date.strftime('%Y-%m-%d')
 
-    # @todo this gets the first magnet, should be the corresponding one...
-    magnet_link_el = magnet_el.getparent().getparent().getparent().find('.//a[@class="magnet"]')
+    # get corresponding magnet link
+    magnet_link_el = magnet_el.getparent().getparent().find('.//a[@class="magnet"]')
 
     if magnet_link_el is None:
       print('Magnet link not found')
       pprint(magnet_el.text)
+      continue # ignore episodes with no magnet link
       exit()
 
     # match magnet hash and filename
-    magnet_url_match = re.match(r'magnet:\?xt=urn:btih:(?P<info_hash>[0-9a-f]{40})', magnet_link_el.attrib['href'])
+    magnet_url_match = re.match(r'magnet:\?xt=urn:btih:(?P<info_hash>[0-9a-f]{40})', magnet_link_el.attrib['href'], re.IGNORECASE)
     if magnet_url_match is None:
       print('Magnet link parse failed')
       pprint(magnet_link_el.attrib['href'])
       exit()
 
-    magnet['info_hash'] = magnet_url_match.group('info_hash')
+    magnet['info_hash'] = magnet_url_match.group('info_hash').lower()
 
-    pprint(magnet)
+    #pprint(magnet)
 
     magnets.append(magnet)
 
@@ -138,7 +142,7 @@ def get_index_page_episode_magnets(page_number = 0):
 
 
 for page_number in range(start_page_number,last_page_number):
-  print('Scraping page ' + str(page_number + 1))
+  print('Scraping page ' + str(page_number))
   magnets = get_index_page_episode_magnets(page_number)
   if len(magnets) == 0:
     print('No magnets found, assuming last page reached.')

@@ -25,34 +25,41 @@ requests_session.headers.update({
 })
 
 
-# DEV
+# @dev
 from pprint import pprint
-
 
 
 # get a list of episode magnets on the index page
 def get_index_page_episode_magnets(page_number = 0):
   magnets = []
 
-  # download page
   page_url = base_url
   if page_number:
     page_url = page_url + 'page_' + str(page_number)
-  #response = requests_session.get(page_url)
 
-  # DEV write cache
-  #text_file = open("cache.html", "w")
-  #text_file.write(response.text)
-  #text_file.close()
+  # cache the downloaded index page so it can be tested without having to download the page each time
+  cache_filename = './cache/page_' + str(page_number) + '.html'
 
-  # DEV read cache
-  with open ("cache.html", "r") as myfile:
-    response_text = myfile.read()
+  # @dev try reading cached page
+  try:
+    with open(cache_filename, 'r') as cached_page_file:
+      response_text = cached_page_file.read()
+
+  except EnvironmentError:
+
+    # download page
+    response = requests_session.get(page_url)
+
+    # @dev save downloaded page to cache
+    cached_page_file = open(cache_filename, 'w')
+    cached_page_file.write(response.text)
+    cached_page_file.close()
+
+    response_text = response.text
 
   # parse html into tree
   dom_tree = etree.fromstring(
-    #response.text,
-    response_text, # DEV
+    response_text,
     parser = etree.HTMLParser(),
     base_url = base_url
   )

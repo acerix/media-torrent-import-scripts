@@ -69,32 +69,64 @@ def get_index_page_episode_magnets(page_number = 0):
 
   for magnet_el in magnet_els:
     magnet = {}
+    magnet['release_name'] = magnet_el.text.strip()
 
-    # match episode code (eg. S02E13) or episode date (eg. 2017 12 31)
-    episode_code_match = re.match(r'(?P<title>.*)(S(?P<season>\d\d)E(?P<episode>\d\d)|(?P<release_date>(20|19)\d\d [01]\d [0123]\d))(?P<quality>.*)', magnet_el.text)
-    if not episode_code_match:
-      print('No episode code or release date found.')
-      exit()
+    # match episode code (eg. S02E13 or S2017E11) or episode date (eg. 2017 12 31)
+    # IGNORECASE eg. "S04e14"
+    episode_code_match = re.match(r'(?P<title>.*)(S(?P<season>\d{2,4})E(?P<episode>\d{2})|(?P<release_date>(20|19)\d\d [01]\d [0123]\d))(?P<release_name>.*)', magnet_el.text, re.IGNORECASE)
+    if episode_code_match:
+      release_date = episode_code_match.group('release_date')
 
-    magnet['title'] = episode_code_match.group('title').strip()
-    magnet['season_number'] = episode_code_match.group('season')
-    magnet['episode_number'] = episode_code_match.group('episode')
-    release_date = episode_code_match.group('release_date')
+    else:
+      # check for format like "Collection 1 10of10" or just "5of5"
+      episode_code_match = re.match(r'(?P<title>.*)((Collection (?P<season>\d+) )?(?P<episode>\d+)of\d+)(?P<release_name>.*)', magnet_el.text, re.IGNORECASE)
+      release_date = None
 
-    if len(magnet['title']) < 4:
+    if episode_code_match:
+      # most episodes match...
+      magnet['title'] = episode_code_match.group('title').strip()
+      magnet['season_number'] = episode_code_match.group('season')
+      magnet['episode_number'] = episode_code_match.group('episode')
+    else:
+      # @todo strip quality, release info, etc., try to get series/episode number
+      # eg. "Ch4 Big Ben Saving the Worlds Most Famous Clock 1080i HDTV MVGroup mkv [eztv]" should be "Big Ben Saving the Worlds Most Famous Clock"
+      magnet['title'] = magnet_el.text.strip()
+
+
+    if len(magnet['title']) < 2:
       print('Title too short')
+      pprint(magnet_el.text)
+      pprint(magnet['title'])
       exit()
 
     # put date in ISO format, ensuring it is valid
     if release_date:
-      parsed_release_date = datetime.datetime.strptime(release_date, '%Y %m %d')
-      magnet['release_date'] = parsed_release_date.strftime('%Y-%m-%d')
+      try:
+        parsed_release_date = datetime.datetime.strptime(release_date, '%Y %m %d')
+        magnet['release_date'] = parsed_release_date.strftime('%Y-%m-%d')
+      except ValueError:
+        # where ya'll from? eg. "2018 17 02"
+        parsed_release_date = datetime.datetime.strptime(release_date, '%Y %d %m')
+        magnet['release_date'] = parsed_release_date.strftime('%Y-%m-%d')
 
+    # @todo this gets the first magnet, should be the corresponding one...
+    magnet_link_el = magnet_el.getparent().getparent().getparent().find('.//a[@class="magnet"]')
 
-    # @todo get hash!
+    if magnet_link_el is None:
+      print('Magnet link not found')
+      pprint(magnet_el.text)
+      exit()
 
-    # @todo detect quality level from string
-    #quality_info = episode_code_match.group('quality').strip()
+    # match magnet hash and filename
+    magnet_url_match = re.match(r'magnet:\?xt=urn:btih:(?P<info_hash>[0-9a-f]{40})', magnet_link_el.attrib['href'])
+    if magnet_url_match is None:
+      print('Magnet link parse failed')
+      pprint(magnet_link_el.attrib['href'])
+      exit()
+
+    magnet['info_hash'] = magnet_url_match.group('info_hash')
+
+    pprint(magnet)
 
     magnets.append(magnet)
 
@@ -106,448 +138,8 @@ def get_index_page_episode_magnets(page_number = 0):
 
 
 for page_number in range(start_page_number,last_page_number):
-  print(page_number)
+  print('Scraping page ' + str(page_number + 1))
   magnets = get_index_page_episode_magnets(page_number)
   if len(magnets) == 0:
     print('No magnets found, assuming last page reached.')
     break
-  print('wood loop')
-  exit()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-print('done yo')
-exit()
-
-
-
-# find/add torrent
-def get_torrent_id(import_row):
-  db_cursor.execute("""
-SELECT
-  id
-FROM
-  torrent
-WHERE
-  hash = :info_hash
-""", import_row)
-  db_row = db_cursor.fetchone()
-
-  if db_row:
-    return db_row['id']
-  else:
-    db_cursor.execute("""
-INSERT INTO
-  torrent
-(
-  hash
-)
-VALUES
-(
-  :info_hash
-)
-""", import_row)
-    return db_cursor.lastrowid
-
-
-
-# find the movie in the database from the row data otherwise add it, then return the database row id
-def get_movie_id(import_row):
-  # find existing by id
-  db_cursor.execute("""
-SELECT
-  id
-FROM
-  movie
-WHERE
-  id = :id
-""", import_row)
-  db_row = db_cursor.fetchone()
-
-  if db_row:
-    return db_row['id']
-  else:
-    db_cursor.execute("""
-INSERT INTO
-  movie
-(
-  id,
-  title,
-  synopsis,
-  theater_release_year,
-  theater_release_date,
-  online_release_date,
-  minutes_long,
-  content_rating_id
-)
-VALUES
-(
-  :id,
-  :title,
-  :synopsis,
-  :theater_release_year,
-  :theater_release_date,
-  :online_release_date,
-  :minutes_long,
-  (SELECT id FROM content_rating WHERE name = :content_rating)
-)
-""", import_row)
-    movie_id = db_cursor.lastrowid
-
-    for genre in import_row['genres'].split(','):
-      if len(genre):
-        db_cursor.execute("""
-INSERT INTO
-  movie_genre
-(
-  movie_id,
-  genre_id
-)
-VALUES
-(
-  :movie_id,
-  (SELECT id FROM genre WHERE name = :genre)
-)
-""", {
-  'movie_id': movie_id,
-  'genre': str(genre)
-})
-
-    return movie_id
-
-
-# find/add release
-def get_movie_release_id(import_row):
-  db_cursor.execute("""
-SELECT
-  id
-FROM
-  movie_release
-WHERE
-  movie_id = :movie_id
-AND
-  release_format_id = (SELECT id FROM release_format WHERE name = :release_format)
-AND
-  video_quality_id = (SELECT id FROM video_quality WHERE name = :video_quality)
-AND
-  name = :release_name
-""", import_row)
-  db_row = db_cursor.fetchone()
-
-  if db_row:
-    return db_row['id']
-  else:
-    db_cursor.execute("""
-INSERT INTO
-  movie_release
-(
-  movie_id,
-  release_format_id,
-  video_quality_id,
-  name,
-  created
-)
-VALUES
-(
-  :movie_id,
-  (SELECT id FROM release_format WHERE name = :release_format),
-  (SELECT id FROM video_quality WHERE name = :video_quality),
-  :release_name,
-  strftime('%s', 'now')
-)
-""", import_row)
-    return db_cursor.lastrowid
-
-# find/add release video
-def get_movie_release_video_id(import_row):
-  db_cursor.execute("""
-SELECT
-  id
-FROM
-  movie_release_video
-WHERE
-  movie_release_id = :movie_release_id
-AND
-  torrent_id = :torrent_id
-AND
-  filename = :video_filename
-""", import_row)
-  db_row = db_cursor.fetchone()
-
-  if db_row:
-    return db_row['id']
-  else:
-    db_cursor.execute("""
-INSERT INTO
-  movie_release_video
-(
-  movie_release_id,
-  torrent_id,
-  filename
-)
-VALUES
-(
-  :movie_release_id,
-  :torrent_id,
-  :video_filename
-)
-""", import_row)
-    return db_cursor.lastrowid
-
-
-
-
-
-# find/add series
-def get_series_id(import_row):
-  # find existing by id
-  db_cursor.execute("""
-SELECT
-  id
-FROM
-  series
-WHERE
-  id = :id
-""", import_row)
-  db_row = db_cursor.fetchone()
-
-  if db_row:
-    return db_row['id']
-  else:
-    db_cursor.execute("""
-INSERT INTO
-  series
-(
-  id,
-  title,
-  synopsis,
-  content_rating_id
-)
-VALUES
-(
-  :id,
-  :series_title,
-  :series_synopsis,
-  (SELECT id FROM content_rating WHERE name = :content_rating)
-)
-""", import_row)
-    series_id = db_cursor.lastrowid
-
-    for genre in import_row['genres'].split(','):
-      if len(genre):
-        db_cursor.execute("""
-INSERT INTO
-  series_genre
-(
-  series_id,
-  genre_id
-)
-VALUES
-(
-  :series_id,
-  (SELECT id FROM genre WHERE name = :genre)
-)
-""", {
-  'series_id': series_id,
-  'genre': genre
-})
-
-    return series_id
-
-# find/add series season
-def get_series_season_id(import_row):
-  # find existing by id
-  db_cursor.execute("""
-SELECT
-  id
-FROM
-  series_season
-WHERE
-  series_id = :series_id
-AND
-  number = :season
-""", import_row)
-  db_row = db_cursor.fetchone()
-
-  if db_row:
-    return db_row['id']
-  else:
-    db_cursor.execute("""
-INSERT INTO
-  series_season
-(
-  series_id,
-  number
-)
-VALUES
-(
-  :series_id,
-  :season
-)
-""", import_row)
-    return db_cursor.lastrowid
-
-# find/add series season episode
-def get_series_season_episode_id(import_row):
-  # find existing by id
-  db_cursor.execute("""
-SELECT
-  id
-FROM
-  series_season_episode
-WHERE
-  series_season_id = :series_season_id
-AND
-  number = :episode
-""", import_row)
-  db_row = db_cursor.fetchone()
-
-  if db_row:
-    return db_row['id']
-  else:
-    db_cursor.execute("""
-INSERT INTO
-  series_season_episode
-(
-  series_season_id,
-  number,
-  title,
-  synopsis,
-  minutes_long,
-  release_date
-)
-VALUES
-(
-  :series_season_id,
-  :episode,
-  :title,
-  :synopsis,
-  :minutes_long,
-  :release_date
-)
-""", import_row)
-    return db_cursor.lastrowid
-
-# find/add episode release
-def get_series_season_episode_release_id(import_row):
-  db_cursor.execute("""
-SELECT
-  id
-FROM
-  series_season_episode_release
-WHERE
-  episode_id = :series_season_episode_id
-AND
-  release_format_id = (SELECT id FROM release_format WHERE name = :release_format)
-AND
-  video_quality_id = (SELECT id FROM video_quality WHERE name = :video_quality)
-AND
-  name = :release_name
-""", import_row)
-  db_row = db_cursor.fetchone()
-
-  if db_row:
-    return db_row['id']
-  else:
-    db_cursor.execute("""
-INSERT INTO
-  series_season_episode_release
-(
-  episode_id,
-  release_format_id,
-  video_quality_id,
-  name,
-  created
-)
-VALUES
-(
-  :series_season_episode_id,
-  (SELECT id FROM release_format WHERE name = :release_format),
-  (SELECT id FROM video_quality WHERE name = :video_quality),
-  :release_name,
-  strftime('%s', 'now')
-)
-""", import_row)
-    return db_cursor.lastrowid
-
-# find/add episode release video
-def get_series_season_episode_release_video_id(import_row):
-  db_cursor.execute("""
-SELECT
-  id
-FROM
-  series_season_episode_release_video
-WHERE
-  episode_release_id = :series_season_episode_release_id
-AND
-  torrent_id = :torrent_id
-AND
-  filename = :video_filename
-""", import_row)
-  db_row = db_cursor.fetchone()
-
-  if db_row:
-    return db_row['id']
-  else:
-    db_cursor.execute("""
-INSERT INTO
-  series_season_episode_release_video
-(
-  episode_release_id,
-  torrent_id,
-  filename
-)
-VALUES
-(
-  :series_season_episode_release_id,
-  :torrent_id,
-  :video_filename
-)
-""", import_row)
-    return db_cursor.lastrowid
-
-
-
-
-# open csv file and process each row
-with open(import_csv_filename) as csv_file:
-  csv_reader = csv.DictReader(csv_file)
-  for row in csv_reader:
-
-
-    # import torrent
-    row['torrent_id'] = get_torrent_id(row)
-
-    # import show
-    if 'episode' in row and len(row['episode']):
-      row['series_id'] = get_series_id(row)
-      row['series_season_id'] = get_series_season_id(row)
-      row['series_season_episode_id'] = get_series_season_episode_id(row)
-      row['series_season_episode_release_id'] = get_series_season_episode_release_id(row)
-      row['series_season_episode_release_video_id'] = get_series_season_episode_release_video_id(row)
-
-    # import movie
-    else:
-      row['movie_id'] = get_movie_id(row)
-      row['movie_release_id'] = get_movie_release_id(row)
-      row['release_video_id'] = get_movie_release_video_id(row)
-
-
-# close db
-db.commit()
-db_cursor.close()
-

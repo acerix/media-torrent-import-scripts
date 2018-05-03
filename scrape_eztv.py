@@ -89,6 +89,8 @@ def get_index_page_episode_magnets(page_number = 0):
       # most episodes match...
       magnet['series_title'] = episode_code_match.group('title').strip()
       magnet['season'] = episode_code_match.group('season')
+      if magnet['season'] is None:
+        magnet['season'] = 1 # assume no season is first season
       magnet['episode'] = episode_code_match.group('episode')
     else:
       # @todo strip quality, release info, etc., try to get series/episode number

@@ -96,6 +96,7 @@ def get_index_page_episode_magnets(page_number = 0):
       # @todo strip quality, release info, etc., try to get series/episode number
       # eg. "Ch4 Big Ben Saving the Worlds Most Famous Clock 1080i HDTV MVGroup mkv [eztv]" should be "Big Ben Saving the Worlds Most Famous Clock"
       magnet['series_title'] = magnet_el.text.strip()
+      magnet['season'] = magnet['episode'] = 1
 
 
     if len(magnet['series_title']) < 2:

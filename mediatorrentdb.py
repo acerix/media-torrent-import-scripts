@@ -17,8 +17,7 @@ from pprint import pprint
 def add_magnet(import_row):
   torrent_id = get_torrent_id(import_row)
   if torrent_id == False:
-    #return False
-    pass
+    return False
 
   # find existing series title to skip imdb lookup
   db_cursor.execute("""

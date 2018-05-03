@@ -106,11 +106,15 @@ def get_index_page_episode_magnets(page_number = 0):
     if release_date:
       try:
         parsed_release_date = datetime.datetime.strptime(release_date, '%Y %m %d')
-        magnet['release_date'] = parsed_release_date.strftime('%Y-%m-%d')
       except ValueError:
         # where ya'll from? eg. "2018 17 02"
         parsed_release_date = datetime.datetime.strptime(release_date, '%Y %d %m')
-        magnet['release_date'] = parsed_release_date.strftime('%Y-%m-%d')
+      magnet['release_date'] = parsed_release_date.strftime('%Y-%m-%d')
+
+      # convert release date to eg. Season 2018 Episode 123
+      magnet['release_date'] = parsed_release_date.strftime('%Y-%m-%d')
+      magnet['season'] = int(parsed_release_date.strftime('%Y'))
+      magnet['episode'] = int(parsed_release_date.strftime('%j')) # day of the year
 
     # get corresponding magnet link
     magnet_link_el = magnet_el.getparent().getparent().find('.//a[@class="magnet"]')
@@ -139,7 +143,7 @@ def get_index_page_episode_magnets(page_number = 0):
 
 
 
-
+end_reached = False
 
 for page_number in range(start_page_number,last_page_number):
   print('Scraping page ' + str(page_number))
@@ -149,10 +153,11 @@ for page_number in range(start_page_number,last_page_number):
     break
 
   for magnet in magnets:
-    mediatorrentdb.add_magnet(magnet)
-    mediatorrentdb.get_imdb_data(magnet)
-    print(magnet)
-    exit()
+    magnet_added = mediatorrentdb.add_magnet(magnet)
+    if not magnet_added:
+      print('Torrent already exists, assuming it\'s because we caught up to the last scrape')
+      end_reached = True
+      break
 
-  print('first page donezo')
-  exit()
+  if end_reached:
+    break

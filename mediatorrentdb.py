@@ -6,21 +6,94 @@ import config
 db = config.db_connect()
 db_cursor = db.cursor()
 
-# add imdb data to the magnet
-def get_imdb_data(import_row):
-  print('get data from imdb...')
-  exit()
-  import_row['id'] = 69
-  return import_row
+# imdb connection
+from imdb import IMDb
+imdb = IMDb()
+
+# @dev
+from pprint import pprint
 
 # add magnet, return True if added, False if already exists
 def add_magnet(import_row):
   torrent_id = get_torrent_id(import_row)
-  # @todo add release or return False if release already added
+  if torrent_id == False:
+    #return False
+    pass
+
+  # find existing series title to skip imdb lookup
+  db_cursor.execute("""
+SELECT
+  id
+FROM
+  series
+WHERE
+  title = :series_title
+""", import_row)
+  db_row = db_cursor.fetchone()
+
+  if db_row:
+    # use cached imdb data
+    import_row['id'] = db_row['id']
+  else:
+    get_imdb_data(import_row)
+
+  # skip series that are not found on imdb
+  if 'id' not in import_row:
+    return -1
+
+  # specify to fix queries..  @todo  get from IMDB?
+  import_row['series_synopsis'] = None
+  import_row['content_rating'] = None
+  import_row['genres'] = ''
+
+  # episode data  @todo  get from IMDB?
+  import_row['title'] = None
+  import_row['synopsis'] = None
+  import_row['minutes_long'] = None
+  import_row['release_date'] = None
+
+  # release data
+  # @todo detect from release name
+  import_row['release_format'] = 'HDTV'
+  import_row['video_quality'] = '720p'
+
+  #pprint(import_row)
+  import_row['series_id'] = get_series_id(import_row)
+  import_row['series_season_id'] = get_series_season_id(import_row)
+  import_row['series_season_episode_id'] = get_series_season_episode_id(import_row)
+  import_row['series_season_episode_release_id'] = get_series_season_episode_release_id(import_row)
+
+  db.commit()
   return True
 
 
-# find/add torrent
+# add imdb data to the magnet
+def get_imdb_data(import_row):
+  imdb_movie_results = movies = imdb.search_movie(import_row['series_title'])
+  if len(imdb_movie_results) == 0:
+    # @todo eg. "Forged in Fire Knife or Death" is not found because it's actually just "Forged in Fire"
+    print('Series not found on IMDB', import_row['series_title'])
+    return import_row
+
+  # assume first result is correct
+  imdb_movie = imdb_movie_results[0]
+
+  # use imdbid
+  import_row['id'] = imdb_movie.movieID
+
+  # assume imdb title is better
+  #import_row['series_title'] = imdb_movie['title']
+
+  # get details
+  #imdb_infoset = imdb.get_movie_infoset()
+  #imdb.update(imdb_movie, imdb_infoset)
+
+  # pprint(import_row)
+
+  return import_row
+
+
+# add torrent and return ID or return false if it exists
 def get_torrent_id(import_row):
   db_cursor.execute("""
 SELECT
@@ -33,7 +106,7 @@ WHERE
   db_row = db_cursor.fetchone()
 
   if db_row:
-    return db_row['id']
+    return False #db_row['id']
   else:
     db_cursor.execute("""
 INSERT INTO

@@ -68,10 +68,19 @@ WHERE
 
 # add imdb data to the magnet
 def get_imdb_data(import_row):
-  imdb_movie_results = movies = imdb.search_movie(import_row['series_title'])
+  imdb_movie_results = imdb.search_movie(import_row['series_title'])
+
+  # @todo eg. "Forged in Fire Knife or Death" is not found because it's actually just "Forged in Fire"
+  # try chopping words off the end of the title until there is a result or no title
+  test_title = import_row['series_title']
+  while len(imdb_movie_results) == 0 and test.lastIndexOf(''):
+    test_title = test_title.substring(0, test.lastIndexOf(' '))
+    print('Title not found on IMDB, trying:', test_title)
+
+    imdb_movie_results = imdb.search_movie(test_title)
+
   if len(imdb_movie_results) == 0:
-    # @todo eg. "Forged in Fire Knife or Death" is not found because it's actually just "Forged in Fire"
-    print('Series not found on IMDB', import_row['series_title'])
+    print('Title not found:', import_row['series_title'])
     return import_row
 
   # assume first result is correct
@@ -105,7 +114,8 @@ WHERE
   db_row = db_cursor.fetchone()
 
   if db_row:
-    return False #db_row['id']
+    #return False  # skip existing
+    return db_row['id'] # process as new
   else:
     db_cursor.execute("""
 INSERT INTO

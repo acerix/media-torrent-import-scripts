@@ -73,10 +73,9 @@ def get_imdb_data(import_row):
   # @todo eg. "Forged in Fire Knife or Death" is not found because it's actually just "Forged in Fire"
   # try chopping words off the end of the title until there is a result or no title
   test_title = import_row['series_title']
-  while len(imdb_movie_results) == 0 and test.lastIndexOf(''):
-    test_title = test_title.substring(0, test.lastIndexOf(' '))
+  while len(imdb_movie_results) == 0 and test_title.count(' '):
+    test_title = test_title.rsplit(' ', 1)[0]
     print('Title not found on IMDB, trying:', test_title)
-
     imdb_movie_results = imdb.search_movie(test_title)
 
   if len(imdb_movie_results) == 0:

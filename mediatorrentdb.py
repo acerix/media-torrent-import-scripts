@@ -30,10 +30,25 @@ WHERE
 """, import_row)
   db_row = db_cursor.fetchone()
 
+
+  if not db_row:
+    # check alternate titles
+    db_cursor.execute("""
+SELECT
+  id
+FROM
+  series_alias
+WHERE
+  title = :series_title
+""", import_row)
+    db_row = db_cursor.fetchone()
+
+
   if db_row:
     # use cached imdb data
     import_row['id'] = db_row['id']
   else:
+    # print('IMDB lookup:', import_row['series_title'])
     get_imdb_data(import_row)
 
   # skip series that are not found on imdb
@@ -70,12 +85,12 @@ WHERE
 def get_imdb_data(import_row):
   imdb_movie_results = imdb.search_movie(import_row['series_title'])
 
-  # @todo eg. "Forged in Fire Knife or Death" is not found because it's actually just "Forged in Fire"
+  # eg. "Forged in Fire Knife or Death" is not found because it's actually just "Forged in Fire"
   # try chopping words off the end of the title until there is a result or no title
   test_title = import_row['series_title']
   while len(imdb_movie_results) == 0 and test_title.count(' '):
     test_title = test_title.rsplit(' ', 1)[0]
-    print('Title not found on IMDB, trying:', test_title)
+    # print('Title not found on IMDB, trying:', test_title)
     imdb_movie_results = imdb.search_movie(test_title)
 
   if len(imdb_movie_results) == 0:
@@ -88,8 +103,24 @@ def get_imdb_data(import_row):
   # use imdbid
   import_row['id'] = imdb_movie.movieID
 
-  # assume imdb title is better
-  #import_row['series_title'] = imdb_movie['title']
+  # use imdb title
+  if import_row['series_title'] != imdb_movie['title']:
+    db_cursor.execute("""
+INSERT INTO
+  series_alias
+(
+  series_id,
+  title
+)
+VALUES
+(
+  :id,
+  :series_title
+)
+""", import_row)
+    db.commit()
+    import_row['series_title'] = imdb_movie['title']
+
 
   # get details
   #imdb_infoset = imdb.get_movie_infoset()

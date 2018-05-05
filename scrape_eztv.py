@@ -118,10 +118,13 @@ def get_index_page_episode_magnets(page_number = 0):
       magnet['season'] = magnet['episode'] = 1
 
 
-    if len(magnet['series_title']) < 2:
+    # @todo clean title, eg. "TV5Monde Chocolat Une Histoire"
+    # @todo replace . with space eg. "Jimmy.Kimmel.2016.07.19.Kristen.Bell.HDTV.x264-CROOKS"
+
+    # eg. 'c 4of9 Eating For Life x264 720p HDTV [eztv]'
+    if len(magnet['series_title']) == 0:
       print('Title too short')
       pprint(magnet_el.text)
-      pprint(magnet['series_title'])
       exit()
 
     # put date in ISO format, ensuring it is valid
@@ -183,5 +186,5 @@ for page_number in range(start_page_number,last_page_number):
           break
 
   if duplicates_in_a_row > 2:
-    print('Saw', duplicates_in_a_row, 'existing torrent in a row, assuming caught up to the last scrape')
+    print('Saw', duplicates_in_a_row, 'existing torrents in a row, assuming caught up to the last scrape')
     break

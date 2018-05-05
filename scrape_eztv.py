@@ -6,6 +6,7 @@ import requests
 from lxml import etree
 import re
 import datetime
+import time
 
 # config
 import config
@@ -31,10 +32,8 @@ requests_session.headers.update({
 # @dev
 from pprint import pprint
 
-
-# get a list of episode magnets on the index page
-def get_index_page_episode_magnets(page_number = 0):
-  magnets = []
+# get index page html
+def get_index_page_dom_tree(page_number = 0, refresh_cache = False):
 
   page_url = base_url
   if page_number:
@@ -45,6 +44,8 @@ def get_index_page_episode_magnets(page_number = 0):
 
   # @dev try reading cached page
   try:
+    if refresh_cache:
+      raise EnvironmentError('Cache disabled')
     with open(cache_filename, 'r') as cached_page_file:
       response_text = cached_page_file.read()
 
@@ -61,11 +62,29 @@ def get_index_page_episode_magnets(page_number = 0):
     response_text = response.text
 
   # parse html into tree
-  dom_tree = etree.fromstring(
+  return etree.fromstring(
     response_text,
     parser = etree.HTMLParser(),
     base_url = base_url
   )
+
+
+# get a list of episode magnets on the index page
+def get_index_page_episode_magnets(page_number = 0):
+  magnets = []
+
+  dom_tree = get_index_page_dom_tree(page_number)
+
+  # test that we got
+  title_el = dom_tree.xpath('//title')
+  tries_left = 3
+  while len(title_el) == 0 or title_el[0].text[:4] != 'EZTV' and tries_left:
+    print('Looks like an error page, waiting to try again...')
+    tries_left -= 1
+    time.sleep(1)
+    dom_tree = get_index_page_dom_tree(page_number, True)
+    title_el = dom_tree.xpath('//title')
+
 
   # find episode links
   magnet_els = dom_tree.xpath('//a[@class="epinfo"]')

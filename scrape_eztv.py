@@ -113,15 +113,22 @@ def get_index_page_episode_magnets(page_number = 0):
       magnet['episode'] = episode_code_match.group('episode')
     else:
       # @todo strip quality, release info, etc., try to get series/episode number
-      # eg. "Ch4 Big Ben Saving the Worlds Most Famous Clock 1080i HDTV MVGroup mkv [eztv]" should be "Big Ben Saving the Worlds Most Famous Clock"
+      # eg. ""
       magnet['series_title'] = magnet_el.text.strip()
       magnet['season'] = magnet['episode'] = 1
 
 
-    # @todo clean title, eg. "TV5Monde Chocolat Une Histoire"
-    # @todo replace . with space eg. "Jimmy.Kimmel.2016.07.19.Kristen.Bell.HDTV.x264-CROOKS"
+    # strip these strings from the beginning of the title
+    garbage_title_prefixes = [
+      'Ch4', # eg. "Ch4 Big Ben Saving the Worlds Most Famous Clock 1080i HDTV MVGroup mkv [eztv]"
+      'TV5' # eg. "TV5Monde Chocolat Une Histoire"
+    ]
+    for prefix in garbage_title_prefixes:
+      if magnet_el.text[:len(prefix)] == prefix:
+        magnet_el.text = magnet_el.text[len(prefix):].strip()
 
-    # eg. 'c 4of9 Eating For Life x264 720p HDTV [eztv]'
+
+    # eg. 'c 4of9 Eating For Life x264 720p HDTV [eztv]' works out to 1 char
     if len(magnet['series_title']) == 0:
       print('Title too short')
       pprint(magnet_el.text)
@@ -147,15 +154,14 @@ def get_index_page_episode_magnets(page_number = 0):
     if magnet_link_el is None:
       print('Magnet link not found')
       pprint(magnet_el.text)
-      continue # ignore episodes with no magnet link
-      exit()
+      continue # skip episodes with no magnet link
 
     # match magnet hash and filename
     magnet_url_match = re.match(r'magnet:\?xt=urn:btih:(?P<info_hash>[0-9a-f]{40})', magnet_link_el.attrib['href'], re.IGNORECASE)
     if magnet_url_match is None:
       print('Magnet link parse failed')
       pprint(magnet_link_el.attrib['href'])
-      exit()
+      continue # skip episodes with invalid magnet link
 
     magnet['info_hash'] = magnet_url_match.group('info_hash').lower()
 

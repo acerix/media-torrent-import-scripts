@@ -66,16 +66,24 @@ WHERE
   import_row['minutes_long'] = None
   import_row['release_date'] = None
 
-  # release data
-  # @todo detect from release name
+  # release data defaults
   import_row['release_format'] = 'HDTV'
-  import_row['video_quality'] = '720p'
+  import_row['video_quality'] = '480p'
+
+  # get release data from release_name
+  import_row = parse_release_data(import_row)
 
   #pprint(import_row)
   import_row['series_id'] = get_series_id(import_row)
   import_row['series_season_id'] = get_series_season_id(import_row)
   import_row['series_season_episode_id'] = get_series_season_episode_id(import_row)
   import_row['series_season_episode_release_id'] = get_series_season_episode_release_id(import_row)
+
+  # add release video entry
+  import_row['torrent_id'] = torrent_id
+  import_row['video_filename'] = '' #  blank filename means "auto detect"
+  import_row['series_season_episode_release_video_id'] = get_series_season_episode_release_video_id(import_row)
+
 
   db.commit()
   return True
@@ -145,6 +153,7 @@ WHERE
 
   if db_row:
     return False  # skip existing
+    # return db_row['id'] # pretend it's new
   else:
     db_cursor.execute("""
 INSERT INTO
@@ -516,3 +525,51 @@ VALUES
 )
 """, import_row)
     return db_cursor.lastrowid
+
+
+# preload release labels, video quality names from tables
+
+db_cursor.execute("""
+SELECT
+  id,
+  name
+FROM
+  video_quality
+ORDER BY
+  id
+""")
+video_quality_labels = db_cursor.fetchall()
+
+db_cursor.execute("""
+SELECT
+  release_format_label.id,
+  release_format_label.label name,
+  release_format.name release_format_name
+FROM
+  release_format_label
+JOIN
+  release_format
+    ON
+      release_format.id = release_format_label.release_format_id
+ORDER BY
+  release_format_label.id
+""")
+release_format_labels = db_cursor.fetchall()
+
+
+
+
+
+# parse the release data, updating title, release format and video quality
+def parse_release_data(import_row):
+
+  for label in video_quality_labels:
+    if label['name'] in import_row['release_name']:
+      #print(label['name'] ,'in', import_row['release_name'])
+      import_row['video_quality'] = label['name']
+
+  for label in release_format_labels:
+    if label['name'] in import_row['release_name']:
+      import_row['release_format'] = label['release_format_name']
+
+  return import_row

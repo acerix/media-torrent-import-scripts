@@ -190,9 +190,11 @@ for page_number in range(start_page_number,last_page_number):
     if not magnet_added:
       print('Torrent already exists:', magnet['info_hash'])
       duplicates_in_a_row += 1
-      if duplicates_in_a_row > 2:
+      if duplicates_in_a_row > 4:
         break
+    else:
+      duplicates_in_a_row = 0
 
-  if duplicates_in_a_row > 2:
+  if duplicates_in_a_row > 4:
     print('Saw', duplicates_in_a_row, 'existing torrents in a row, assuming caught up to the last scrape')
     break

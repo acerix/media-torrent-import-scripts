@@ -144,8 +144,7 @@ WHERE
   db_row = db_cursor.fetchone()
 
   if db_row:
-    #return False  # skip existing
-    return db_row['id'] # process as new
+    return False  # skip existing
   else:
     db_cursor.execute("""
 INSERT INTO

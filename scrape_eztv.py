@@ -18,6 +18,8 @@ base_url = 'https://eztv.ag/'
 start_page_number = 0
 last_page_number = 2000
 
+enable_cache = False
+
 # database connection
 db = config.db_connect()
 db_cursor = db.cursor()
@@ -44,7 +46,7 @@ def get_index_page_dom_tree(page_number = 0, refresh_cache = False):
 
   # @dev try reading cached page
   try:
-    if refresh_cache:
+    if refresh_cache or not enable_cache:
       raise EnvironmentError('Cache disabled')
     with open(cache_filename, 'r') as cached_page_file:
       response_text = cached_page_file.read()
@@ -189,7 +191,7 @@ for page_number in range(start_page_number,last_page_number):
       print('Torrent already exists:', magnet['info_hash'])
       duplicates_in_a_row += 1
       if duplicates_in_a_row > 2:
-          break
+        break
 
   if duplicates_in_a_row > 2:
     print('Saw', duplicates_in_a_row, 'existing torrents in a row, assuming caught up to the last scrape')
